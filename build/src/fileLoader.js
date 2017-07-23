@@ -12,6 +12,7 @@ class FileLoader {
     this.store = qgp.store
     this.collections = this.config.getGlobal('collections')
     this.table = {}
+    this.root = qgp.root
   }
 
   async processCollection ({store, checkpoint}) {
@@ -34,12 +35,12 @@ class FileLoader {
 
   async processItem ({item}) {
     const fullpath = item.path()
-    const data = fs.readFileSync(fullpath, 'utf8')
+    const data = fs.readFileSync(nodepath.join(this.root, fullpath), 'utf8')
     item.setContent(data) 
   }
 
   async _processCollectionIter (collname, path) {
-    const files = fs.readdirSync(path)
+    const files = fs.readdirSync(nodepath.join(this.root, path))
     for (const filename of files) {
       // Skip special
       if (filename[0] === '_') continue
@@ -47,7 +48,7 @@ class FileLoader {
       if ((this.config.get(collname, 'excludes') || {})[filename]) continue
       //
       const fullpath = nodepath.join(path, filename)
-      const stat = fs.statSync(fullpath)
+      const stat = fs.statSync(nodepath.join(this.root, fullpath))
       if (stat.isDirectory()) {
         this._processCollectionIter(collname, fullpath)
       } else {
@@ -71,6 +72,7 @@ class FileLoader {
             item.setMtime(stat.mtimeMs)
             item.setUpdated(true)
             item.setPath(fullpath)
+            DEBUG('updated item', item.path())
           }
           this.table[type].update(item.item)
         } else {
@@ -87,7 +89,7 @@ class FileLoader {
           item.setCollection(collname)
           item.setType(type)
           item.setLastChecked(this.checkpoint)
-          DEBUG('add new item', item.item)
+          DEBUG('add new item', item.path())
           this.table[type].insert(item.item)
         }
       }

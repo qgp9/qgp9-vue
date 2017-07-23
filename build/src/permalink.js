@@ -1,3 +1,5 @@
+const {DEBUG, ERROR} = require('./error.js')
+
 class Permalink {
   constructor () {
     this.name = 'Permalink'
@@ -21,12 +23,19 @@ class Permalink {
         .replace(':path', item.src().replace(/(\/index)?\.[^.]+$/,'').split('/').slice(2).join('/'))
 
       const date = new Date(item.date())
+      let year = ''
+      let month = ''
+      let day = ''
       if (date) {
-        permalink = permalink
-          .replace(':year', date.getFullYear())
-          .replace(':month', ('0' + date.getMonth()).slice(-2))
-          .replace(':day', ('0' + date.getDay()).slice(-2))
+        year += date.getFullYear()
+        month += ('0' + (date.getMonth() + 1)).slice(-2)
+        day += ('0' + date.getDate()).slice(-2)
       }
+      DEBUG(15, `${item.date()} -- ${new Date(item.date())} -- ${year} ${month} ${day}`)
+      permalink = permalink
+        .replace(':year', year)
+        .replace(':month', month)
+        .replace(':day', day)
     }
     item.setPermalink(permalink)
     let url = '/' + permalink // TODO include baseurl?

@@ -14,11 +14,17 @@ const configDefault = {
     pages: {
       type: 'page',
       path: '.',
-      permalink: '/:path'
+      permalink: '/:path',
+      list: '/pages/list',
+      pagenation: 20,
+      archive: false
     },
     posts: {
       type: 'page',
-      path: '_posts'
+      path: '_posts',
+      list: '/posts/list',
+      pagenation: 20,
+      archive: '/archive'
     },
     static: {
       type: 'file',

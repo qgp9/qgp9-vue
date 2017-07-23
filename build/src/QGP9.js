@@ -1,29 +1,36 @@
 const nodepath = require('path')
 // const fs = require('fs-extra')
-
+const Train = require('night-train')
+const {ERROR, DEBUG} = require('./error.js')
 const Item = require('./item.js')
 const Store = require('./store.js')
 const Config = require('./config.js')
-const Train = require('night-train')
 const configDefault = require('./config-default.js')
+
+/*
 const FileLoader = require('./fileLoader.js')
 const FrontMatter = require('./frontmatter.js')
 const FilenameHandler = require('./filename-handler.js')
 const Permalink = require('./permalink.js')
 const ApiWriter = require('./api-writer.js')
 const StaticHandler = require('./static-handler.js')
-const {ERROR, DEBUG} = require('./error.js')
+*/
 
 class QGP9 {
   constructor(config){
+    this.root = '.'
     this.config = new Config
     this.config.addObj(configDefault)
     this.trains = new Train([
       'processCollection',
       'processItem',
       'processInstall',
-      'processAfterInstall'
+      'processPostInstall',
+      'cleanInstall',
+      'cleanPostInstall'
     ])
+    this.dbLoaded = false
+    this.registered = false
   }
 
   /**
@@ -33,7 +40,7 @@ class QGP9 {
    * @param {string} path path of configuration file. Possible extensions are yml, yaml, tml, toml, js, json
    */
   configure (path) {
-    this.config.addFile(path)
+    this.config.addFile(nodepath.join(this.root, path))
     return this
   }
 
@@ -44,7 +51,13 @@ class QGP9 {
    * @param {string} path path of source directory from current directory
    */
   source (path) {
-    this.config.set('sourc', path)
+    // FIXME
+    this.config.set('source_dir', path)
+    return this
+  }
+
+  setRoot (path) {
+    this.root = path
     return this
   }
 
@@ -79,10 +92,6 @@ class QGP9 {
     for (const item of items) {
       const itemObj = new Item(item)
       const promise = this.trains.run('processItem', {item: itemObj})
-        .then(() => {
-          // item.updated = false
-          //pages.update(item)
-        })
         .catch(ERROR)
       plist.push(promise)
     }
@@ -90,18 +99,13 @@ class QGP9 {
     this.store.save()
   }
 
+  async init() {
+    if (!this.dbLoaded){
+      await this.store.load()
+        .catch(ERROR)
+      this.dbLoaded = true
+    }
 
-  async run () {
-    const qgp = this
-
-    await this.store.load()
-      .catch(ERROR)
-    /*
-    await new Promise((resolve, reject) => this.store.loadDatabase({}, err => {
-      if (err) reject(err)
-      else resolve()
-    }))
-    */
     // Finalize config
     this.config._normalize()
 
@@ -115,56 +119,51 @@ class QGP9 {
       indices: ['collection']
     }).catch(ERROR)
 
-    const checkpoint = this.checkpoint = Date.now()
-
     // register plugin
+    if (!this.registered) {
     await this.trains.runAsync('register', this)
+      .then(() => { this.registered = true })
       .catch(ERROR)
+    }
+  }
 
+
+  async run () {
+    const qgp = this
+    const checkpoint = this.checkpoint = Date.now()
+    await this.init().catch(ERROR)
     await this.trains.run('processCollection', {qgp, checkpoint})
       .catch(ERROR)
-
     await this._processItems()
       .catch(ERROR)
-
     await this.trains.run('processInstall', {qgp, checkpoint})
       .catch(ERROR)
-
-    /*
-
-    plist = []
-    for (const collection in this.config.collections) {
-      plist.push(this.train.run('processCollection', {collname, store, qgp}))
-    }
-    await Promise.all(plist)
-
-    await this.afterProcessInstall()
-    */
-
-    //this.store.table('page').then(c => c.findOne({collection:'posts'})).then(DEBUG).catch(ERROR)
-    //this.store.table('page').then(c => c.findOne({collection:'pages'})).then(DEBUG).catch(ERROR)
-    //this.store.table('file').then(c => c.find() ).then(DEBUG).catch(ERROR)
-
-    //this.store.table('page').then(c => c.find()).then(item => { item.content = null }).catch(ERROR)
     await this.store.save().catch(ERROR)
+  }
+
+  async postRun () {
+    const qgp = this
+    const checkpoint = this.checkpoint = Date.now()
+    await this.init().catch(ERROR)
+    await this.trains.run('processPostInstall', {qgp, checkpoint})
+      .catch(ERROR)
+  }
+
+  async cleanInstall () {
+    const qgp = this
+    const checkpoint = this.checkpoint = Date.now()
+    await this.init().catch(ERROR)
+    // await this.trains.run('cleanInstall', {qgp}).catch(ERROR)
+    await this.store.delete().catch(ERROR)
+  }
+
+  async cleanPostInstall () {
+    const qgp = this
+    const checkpoint = this.checkpoint = Date.now()
+    await this.init().catch(ERROR)
+    await this.trains.run('cleanPostInstall', {qgp}).catch(ERROR)
   }
 }
 
-let qgp = new QGP9
-qgp.configure('_config.yml')
-  .useStore(new Store('store.json'))
-  .use(new FileLoader)
-  .use(new FrontMatter)
-  .use(new FilenameHandler)
-  .use(new Permalink)
-//  .use(new Taxonomy)
-  .use(new ApiWriter)
-  .use(new StaticHandler)
-//  .use(new SpaHandler)
-  .run()
-  .then(() => console.log('Well done'))
-  .catch(err => { throw err })
-// qgp.scanSource()
-// qgp.readCollections()
-//console.log(qgp.collections)
-// console.log(qgp.updated)
+
+module.exports = QGP9

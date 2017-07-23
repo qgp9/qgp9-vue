@@ -11,6 +11,7 @@ class StaticHandler {
   async register (qgp) {
     this.config = qgp.config
     this.store = qgp.store
+    this.root = qgp.root
   }
 
   async processInstall ({checkpoint}) {
@@ -19,8 +20,9 @@ class StaticHandler {
     const plist = []
     for (const fileRaw of files) {
       const item = new Item(fileRaw)
-      const src = item.path()
+      const src = path.join(this.root, item.path())
       const target = path.join(
+        this.root,
         this.config.get(item.collection(), 'target_dir'),
         item.url()
       )
@@ -30,7 +32,6 @@ class StaticHandler {
           .catch(ERROR)
         plist.push(promise)
       }
-      DEBUG(item.lastChecked(), checkpoint)
       if (item.lastChecked() < checkpoint) {
         DEBUG('delete item ', item.path())
         const promise = fs.remove(target)

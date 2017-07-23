@@ -86,6 +86,15 @@ class Store {
       })
     })
   }
+
+  async delete () {
+    await new Promise((resolve, reject) => {
+      this.db.deleteDatabase(err => {
+        if (err) reject(err)
+        else resolve()
+      })
+    })
+  }
 }
 
 module.exports = Store
