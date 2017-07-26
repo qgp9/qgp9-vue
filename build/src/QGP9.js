@@ -6,6 +6,7 @@ const Item = require('./item.js')
 const Store = require('./store.js')
 const Config = require('./config.js')
 const configDefault = require('./config-default.js')
+const Helper = require('./helper.js')
 
 /*
 const FileLoader = require('./fileLoader.js')
@@ -83,15 +84,15 @@ class QGP9 {
    * Helper function to run each 'processItem' train
    * @private
    */ 
-  async _processItems () {
+  async _processItems (h) {
     const pages = await this.store.table('page').catch(ERROR)
     const items =  pages.find({
       updated: true
     })
     const plist = []
-    for (const item of items) {
-      const itemObj = new Item(item)
-      const promise = this.trains.run('processItem', {item: itemObj})
+    for (const itemRaw of items) {
+      const item = new Item(itemRaw)
+      const promise = this.trains.run('processItem', {h, item})
         .catch(ERROR)
       plist.push(promise)
     }
@@ -131,12 +132,13 @@ class QGP9 {
   async run () {
     const qgp = this
     const checkpoint = this.checkpoint = Date.now()
+    const h = new Helper(this)
     await this.init().catch(ERROR)
-    await this.trains.run('processCollection', {qgp, checkpoint})
+    await this.trains.run('processCollection', {h, qgp, checkpoint})
       .catch(ERROR)
-    await this._processItems()
+    await this._processItems(h)
       .catch(ERROR)
-    await this.trains.run('processInstall', {qgp, checkpoint})
+    await this.trains.run('processInstall', {h, qgp, checkpoint})
       .catch(ERROR)
     await this.store.save().catch(ERROR)
   }
@@ -144,14 +146,16 @@ class QGP9 {
   async postRun () {
     const qgp = this
     const checkpoint = this.checkpoint = Date.now()
+    const h = new Helper(this)
     await this.init().catch(ERROR)
-    await this.trains.run('processPostInstall', {qgp, checkpoint})
+    await this.trains.run('processPostInstall', {h, qgp, checkpoint})
       .catch(ERROR)
   }
 
   async cleanInstall () {
     const qgp = this
     const checkpoint = this.checkpoint = Date.now()
+    const h = new Helper(this)
     await this.init().catch(ERROR)
     // await this.trains.run('cleanInstall', {qgp}).catch(ERROR)
     await this.store.delete().catch(ERROR)
@@ -160,10 +164,10 @@ class QGP9 {
   async cleanPostInstall () {
     const qgp = this
     const checkpoint = this.checkpoint = Date.now()
+    const h = new Helper(this)
     await this.init().catch(ERROR)
-    await this.trains.run('cleanPostInstall', {qgp}).catch(ERROR)
+    await this.trains.run('cleanPostInstall', {h, qgp}).catch(ERROR)
   }
 }
-
 
 module.exports = QGP9

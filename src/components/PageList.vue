@@ -1,13 +1,13 @@
 <template>
   <div class="page-list">
     <ul>
-      <li v-for="item in data.data"> <router-link :to="{path:item.url}">{{item.matter.title}} - {{item.url}} </router-link></li>
+      <li v-for="item in currentList.data"> <router-link :to="{path:item.url}">{{item.title}} - {{item.url}} </router-link></li>
     </ul>
   </div>
 </template>
 
 <script>
-import axios from 'axios'
+import {mapGetters} from 'vuex'
 export default {
   name: 'PageList',
   data () {
@@ -15,18 +15,21 @@ export default {
       data: {}
     }
   },
+  computed: {
+    ...mapGetters('qgp', [
+      'currentList'
+    ])
+  },
   created () {
     this.update()
   },
   watch: {
-    data () {
-    }
   },
   methods: {
     update () {
-      const collection = this.$route.params.collection
-      axios.get('/api/url/' + collection + '/list.json')
-        .then(res => { this.data = res.data; console.log(res) })
+      let path = this.$route.path
+      if (!path) return
+      this.$store.dispatch('qgp/useListAsCurrent', path)
     }
   }
 }

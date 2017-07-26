@@ -1,31 +1,40 @@
 <template>
-  <div class="hello">
-    HIHI
-    <p>
+  <div class="qgp-page">
+    <router-link :to="currentList.url">List</router-link>
+    <router-link :to="next.url">Next</router-link>
+    <router-link :to="previous.url">Previous</router-link>
     <div v-html="content"></div>
-    </p>
   </div>
 </template>
 
 <script>
-import axios from 'axios'
+import {mapGetters} from 'vuex'
 import marked from 'marked'
 export default {
-  name: 'hello',
-  data () {
-    return {
-      content: '',
-      msg: 'Welcome to Your Vue.js App'
-    }
+  name: 'Page',
+  computed: {
+    path () { return this.$route.path },
+    content () {
+      if (this.current.ext === 'md') return marked(this.current.data)
+      return this.current.data
+    },
+    ...mapGetters('qgp', [
+      'current',
+      'currentList',
+      'next',
+      'previous'
+    ])
   },
   created () {
     this.update()
   },
+  watch: {
+    $route () { this.update() }
+  },
   methods: {
     update () {
-      const url = this.$route.params.url
-      axios.get('/api/url/' + url + '.json')
-        .then(res => { this.content = marked(res.data.content); console.log(res) })
+      console.log(this.$route)
+      this.$store.dispatch('qgp/usePageAsCurrent', this.path)
     }
   }
 }

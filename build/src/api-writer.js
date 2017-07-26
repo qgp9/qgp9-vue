@@ -17,30 +17,27 @@ class ApiWriter {
     this.root = qgp.root
   }
 
-  async processInstall ({checkpoint}) {
+  async processInstall ({checkpoint, h}) {
     const pages = await this.store.table('page').catch(ERROR)
     const items = pages.find()
-    const collections = this.config.get('', 'collections')
-    const collData = {}
-    for (const collname in collections) {
-      collData[collname] = {
-        data: []
-      }
-    }
+    const collections = h.collections
+    const collData = h.genCollectionMap(() =>({
+      data: []
+    }))
     let plist = []
     for (const itemRaw of items) {
       const item = new Item(itemRaw)
       const collname = item.collection()
-      const apiPath = path.join(
+      const apiPath = h.getApiPath(collname)
+      /*
+      path.join(
         this.root,
         this.config.get(collname, 'target_dir'),
         this.config.get(collname, 'api_point')
       )
-      const fullpath = path.join(
-        apiPath,
-        'url',
-        item.url() + '.json'
-      )
+      */
+      const fullpath = h.getItemApiPath(item)
+
       if (item.lastChecked() < checkpoint) {
         DEBUG('item deleted' , item.path())
         const promise = fs.remove(fullpath)
@@ -54,6 +51,7 @@ class ApiWriter {
         mtime: item.mtime(),
         matter: item.matter(),
       })
+
       if (!item.updated()) continue
       const promise = fs.outputJson(fullpath, item.item)
         .then(() => { item.setUpdated(false); pages.update(item.item) })
@@ -66,7 +64,7 @@ class ApiWriter {
     // Write list
     //
     plist = []
-    for (const collname in collections) {
+    for (const collname in h.collections) {
       const data = collData[collname]
       const listPath = this.config.get(collname, 'list')
       if (listPath) {
@@ -79,25 +77,10 @@ class ApiWriter {
         // Pagenation
         const pagenation = this.config.get(collname, 'pagenation')
         if (pagenation) {
-          let page = 0
-          let size = data.data.length
-          let copy = []
-          copy.concat(data.data)
-          while (copy.length > 0){
-            page++
-            const list = copy.splice(0, pagenation)
-            const paged = {
-              collection: collname,
-              type: 'list',
-              size: list.length,
-              page: page,
-              size_all: size,
-              updatedAt: new Date(checkpoint),
-              data: list
-            }
-            const promise = fs.outputJson(path.join(this._apiPath(collname), 'url', listPath, page + '.json'), paged)
-            plist.push(promise)
-          }
+          h.writePagenation(data.data, pagenation, 
+            h.getApiPath(collname, 'url', listPath), {
+              collection: collname
+            })
         }
       }
 
